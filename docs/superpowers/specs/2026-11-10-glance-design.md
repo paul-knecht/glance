@@ -108,8 +108,13 @@ or the question's answer if he asked a question after last switching tabs.
 **(Claude's call)** If text is selected in the question field, `⌘C` copies
 that as usual.
 
-**Menu bar.** A menu-bar-only app (no Dock icon). Clicking the icon opens a
-menu: a disabled first line "Hotkey: ⌃⌥Space", "Set API key…", "Quit".
+**Background app (changed on 2026-11-10 at the user's request).** Glance has
+no menu bar icon and no Dock icon. It is installed in `/Applications`, runs
+in the background and starts at login. Opening the app again while it runs
+shows a small settings window: the hotkey, "Start Glance when I log in",
+"Set API key…" and "Quit Glance". An installed copy adds itself to the login
+items the first time it runs; a copy in a build folder never does.
+**(Claude's call on the settings window and the first-run behaviour.)**
 
 **Messages** (exact text):
 
@@ -118,9 +123,9 @@ menu: a disabled first line "Hotkey: ⌃⌥Space", "Set API key…", "Quit".
 | No Accessibility permission | "Glance needs the Accessibility permission to read the text you selected in other apps." Button: "Open System Settings" |
 | Nothing selected | "Select some text first, then press ⌃⌥Space." |
 | Selection too long | "The selection is too long. The limit is 20,000 characters." |
-| No API key | "Add an Anthropic API key from the Glance menu bar icon to get answers." |
+| No API key | "Add an Anthropic API key to get answers: open the Glance app again and choose Set API key." |
 | Offline | "No internet connection." |
-| HTTP 401 | "The API key was not accepted. Set it again from the menu bar icon." |
+| HTTP 401 | "The API key was not accepted. Open the Glance app again and set it once more." |
 | Model declined | "Claude declined to answer this." |
 | No credit on the account (402, or a "credit balance" error) | "Your Anthropic account has no credit. Add credit in the Anthropic Console." |
 | Rate limited or overloaded (429, 529) | "Claude is busy right now. Try again in a moment." |
@@ -205,7 +210,7 @@ Keychain store. Each in its own small file.
   first…" even though text is selected.
 - **Clipboard managers** may record the brief copy made by the fallback.
 - **Hotkey taken.** If another app already uses `⌃⌥Space`, the hotkey may not
-  fire; the menu's first line then reads "Hotkey ⌃⌥Space is not available".
+  fire; the settings window then says so.
 - **Speed.** The first words depend on the network and the model; expect
   around a second.
 

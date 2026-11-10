@@ -20,3 +20,6 @@ xcuserdata/
 
 # Superpowers scratch files
 .superpowers/
+
+# Log of a failed install build
+build-install.log

@@ -12,9 +12,9 @@ enum ClaudeError: Error, Equatable {
 
     var message: String {
         switch self {
-        case .noKey: return "Add an Anthropic API key from the Glance menu bar icon to get answers."
+        case .noKey: return "Add an Anthropic API key to get answers: open the Glance app again and choose Set API key."
         case .offline: return "No internet connection."
-        case .unauthorized: return "The API key was not accepted. Set it again from the menu bar icon."
+        case .unauthorized: return "The API key was not accepted. Open the Glance app again and set it once more."
         case .noCredit: return "Your Anthropic account has no credit. Add credit in the Anthropic Console."
         case .busy: return "Claude is busy right now. Try again in a moment."
         case .refused: return "Claude declined to answer this."

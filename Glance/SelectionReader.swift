@@ -32,7 +32,7 @@ enum SelectionReader {
         // The primary screen's height is needed to convert coordinates below.
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
 
-        // Way 1 runs in the background so a slow app cannot freeze our menu bar icon.
+        // Way 1 runs in the background so a slow app cannot freeze Glance.
         let (selection, outcome) = await Task.detached { readDirectly(screenHeight: screenHeight) }.value
         switch outcome {
         case .found: return selection

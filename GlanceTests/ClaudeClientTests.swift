@@ -62,9 +62,9 @@ final class ClaudeClientTests: XCTestCase {
     }
 
     func testMessages() {
-        XCTAssertEqual(ClaudeError.noKey.message, "Add an Anthropic API key from the Glance menu bar icon to get answers.")
+        XCTAssertEqual(ClaudeError.noKey.message, "Add an Anthropic API key to get answers: open the Glance app again and choose Set API key.")
         XCTAssertEqual(ClaudeError.offline.message, "No internet connection.")
-        XCTAssertEqual(ClaudeError.unauthorized.message, "The API key was not accepted. Set it again from the menu bar icon.")
+        XCTAssertEqual(ClaudeError.unauthorized.message, "The API key was not accepted. Open the Glance app again and set it once more.")
         XCTAssertEqual(ClaudeError.noCredit.message, "Your Anthropic account has no credit. Add credit in the Anthropic Console.")
         XCTAssertEqual(ClaudeError.busy.message, "Claude is busy right now. Try again in a moment.")
         XCTAssertEqual(ClaudeError.refused.message, "Claude declined to answer this.")

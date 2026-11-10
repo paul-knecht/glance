@@ -1,0 +1,62 @@
+<style>
+  .kp { background:#f6f6f7; color:#1d1d1f; border-radius:12px; border:1px solid #d2d2d7; box-shadow:0 8px 24px rgba(0,0,0,.18); font:13px -apple-system,system-ui,sans-serif; padding:12px; text-align:left; max-width:360px; margin:14px auto; }
+  .kp .word { font-size:17px; font-weight:600; }
+  .kp .pos { color:#6e6e73; font-style:italic; font-size:12px; margin-left:6px; }
+  .kp .sel { color:#6e6e73; font-size:12px; border-left:3px solid #c7c7cc; padding:2px 8px; margin-bottom:8px; }
+  .kp .lbl { font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:#8e8e93; margin:10px 0 2px; }
+  .kp .ask { margin-top:12px; background:#fff; border:1px solid #d2d2d7; border-radius:7px; padding:6px 9px; color:#8e8e93; font-size:12px; }
+  .kp .tabs { display:flex; background:#e5e5ea; border-radius:8px; padding:2px; margin-bottom:10px; }
+  .kp .tab { flex:1; text-align:center; padding:4px 0 3px; border-radius:6px; font-size:12px; color:#3a3a3c; line-height:1.2; }
+  .kp .tab small { display:block; font-size:9px; color:#8e8e93; }
+  .kp .tab.on { background:#fff; font-weight:600; }
+  .kp .foot { display:flex; justify-content:space-between; color:#8e8e93; font-size:11px; margin-top:10px; }
+</style>
+
+<h2>A with the tab bar from C</h2>
+<p class="subtitle">The first tab is already filled in when the panel opens. ⌘1 to ⌘4 flip between tabs. Left: you selected one word. Right: you selected a whole passage.</p>
+
+<div class="split">
+
+  <div class="mockup">
+    <div class="mockup-header">One word selected</div>
+    <div class="mockup-body">
+      <div class="kp">
+        <div class="tabs">
+          <span class="tab on">Explain<small>⌘1</small></span>
+          <span class="tab">Translate<small>⌘2</small></span>
+          <span class="tab">Summarise<small>⌘3</small></span>
+          <span class="tab">Rewrite<small>⌘4</small></span>
+        </div>
+        <div><span class="word">ubiquitous</span><span class="pos">adjective</span></div>
+        <div class="lbl">Definition</div>
+        <div>Present or found everywhere at the same time.</div>
+        <div class="lbl">German</div>
+        <div>allgegenwärtig</div>
+        <div class="lbl">In this sentence</div>
+        <div>Smartphones are so common that you see them wherever you go.</div>
+        <div class="ask">Ask about the selection…</div>
+        <div class="foot"><span>⌘C copy</span><span>esc to close</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">A passage selected</div>
+    <div class="mockup-body">
+      <div class="kp">
+        <div class="tabs">
+          <span class="tab on">Explain<small>⌘1</small></span>
+          <span class="tab">Translate<small>⌘2</small></span>
+          <span class="tab">Summarise<small>⌘3</small></span>
+          <span class="tab">Rewrite<small>⌘4</small></span>
+        </div>
+        <div class="sel">“Loss aversion implies that the disutility of giving up an object is greater than the utility of acquiring it…”</div>
+        <div class="lbl">In plain words</div>
+        <div>Losing something hurts more than gaining the same thing feels good. That is why people often demand more money to give up an item than they would pay to get it.</div>
+        <div class="ask">Ask about the selection…</div>
+        <div class="foot"><span>⌘C copy</span><span>esc to close</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>

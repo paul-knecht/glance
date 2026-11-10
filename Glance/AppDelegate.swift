@@ -1,6 +1,7 @@
 import AppKit
+import SwiftUI
 
-// Owns the menu bar icon and its menu.
+// Owns the menu bar icon and its menu, the hotkey and the floating panel.
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -12,6 +13,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // The first line of the menu. It tells you the hotkey.
     let hotkeyItem = NSMenuItem(title: "Hotkey: ⌃⌥Space", action: nil, keyEquivalent: "")
+
+    // The global hotkey ⌃⌥Space.
+    var hotkey: Hotkey!
+
+    // The floating window and what it shows. The model gets the real pieces
+    // it needs: a way to read the API key, and the request to Claude.
+    let panel = PanelWindow()
+    lazy var model = PanelModel(
+        loadKey: { [keychain] in keychain.load() },
+        stream: { system, user, apiKey in
+            ClaudeClient.stream(system: system, user: user, apiKey: apiKey)
+        }
+    )
+
+    // True while we are reading the selection, so a second press is ignored.
+    private var isReading = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create the menu bar icon.
@@ -42,6 +59,133 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let mainMenu = NSMenu()
         mainMenu.addItem(editItem)
         NSApp.mainMenu = mainMenu
+
+        // Put the SwiftUI view into the floating window. When the view's
+        // height changes, the window follows.
+        let view = PanelView(model: model) { [weak self] height in
+            self?.resizePanel(to: height)
+        }
+        let hostingView = NSHostingView(rootView: view)
+        // We size the window ourselves (see resizePanel), so the view must not.
+        hostingView.sizingOptions = []
+        panel.contentView = hostingView
+
+        // Listen for the hotkey.
+        hotkey = Hotkey { [weak self] in
+            // The hotkey always arrives on the main thread.
+            MainActor.assumeIsolated { self?.hotkeyPressed() }
+        }
+        if !hotkey.isRegistered {
+            hotkeyItem.title = "Hotkey ⌃⌥Space is not available"
+        }
+
+        // Keys pressed while the panel has the keyboard: esc, ⌘1–⌘4, ⌘C.
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.panel.isVisible, event.window === self.panel else { return event }
+            // Returning nil means "handled, don't pass it on".
+            return self.handleKey(event) ? nil : event
+        }
+
+        // Close the panel when the user clicks anywhere outside Glance.
+        // (A "global monitor" hears clicks that go to other apps.)
+        NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in self?.closePanel() }
+        }
+    }
+
+    // MARK: - Panel
+
+    // Called when ⌃⌥Space is pressed.
+    func hotkeyPressed() {
+        // While the panel is open, the hotkey closes it.
+        if panel.isVisible {
+            closePanel()
+            return
+        }
+        guard !isReading else { return }
+        isReading = true
+
+        // Remember where the mouse is now, in case the app can't tell us
+        // where the selection is.
+        let mouse = NSEvent.mouseLocation
+        let hasPermission = SelectionReader.hasPermission
+
+        Task {
+            let selection = hasPermission ? await SelectionReader.read() : nil
+            isReading = false
+            model.open(selection: selection, hasPermission: hasPermission)
+            showPanel(anchor: selection?.anchor, mouse: mouse)
+        }
+    }
+
+    // Places the panel near the selection (or the mouse) and shows it.
+    private func showPanel(anchor: CGRect?, mouse: CGPoint) {
+        // Use the screen the selection or the mouse is on.
+        let point = anchor?.origin ?? mouse
+        let screen = NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
+        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+
+        let origin = PanelPlacement.origin(anchor: anchor, mouse: mouse,
+                                           panelSize: panel.frame.size, screen: visible)
+        panel.setFrameOrigin(origin)
+
+        // Show it and give it the keyboard, without making Glance the active app.
+        panel.orderFrontRegardless()
+        panel.makeKey()
+    }
+
+    func closePanel() {
+        guard panel.isVisible else { return }
+        panel.orderOut(nil)
+        model.close()
+    }
+
+    // Changes the window's height to fit its content. The top edge stays
+    // where it is, so the panel grows downwards as the answer arrives.
+    private func resizePanel(to height: CGFloat) {
+        guard height > 0, abs(panel.frame.height - height) > 0.5 else { return }
+        var frame = panel.frame
+        let top = frame.maxY
+        frame.size.height = height
+        frame.origin.y = top - height
+
+        // If it would now hang off the bottom of the screen, move it up.
+        if let visible = panel.screen?.visibleFrame {
+            frame.origin.y = max(frame.origin.y, visible.minY + PanelPlacement.margin)
+        }
+        panel.setFrame(frame, display: true)
+    }
+
+    // Handles a key press in the panel. Returns true if the key was used.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        let command = event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
+
+        // esc closes the panel.
+        if event.keyCode == 53 {
+            closePanel()
+            return true
+        }
+
+        // ⌘1 to ⌘4 switch tabs.
+        if command, let number = Int(event.charactersIgnoringModifiers ?? ""),
+           let tab = Action(rawValue: number - 1), model.notice == nil {
+            model.select(tab)
+            return true
+        }
+
+        // ⌘C copies the answer, unless text is selected in the question field.
+        if command, event.charactersIgnoringModifiers == "c" {
+            if let editor = panel.firstResponder as? NSTextView, editor.selectedRange().length > 0 {
+                return false
+            }
+            guard let text = model.textToCopy else { return true }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            model.noteCopied()
+            return true
+        }
+
+        return false
     }
 
     // Shows a small dialog where the user types their Anthropic API key.

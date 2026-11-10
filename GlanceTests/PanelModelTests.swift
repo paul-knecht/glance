@@ -232,6 +232,15 @@ final class PanelModelTests: XCTestCase {
         XCTAssertEqual(model.textToCopy, "Definition: Everywhere.\nGerman: allgegenwärtig")
     }
 
+    // After ⌘C the footer says "Copied" until the next look-up.
+    func testNoteCopiedSetsFlagAndOpenClearsIt() {
+        XCTAssertFalse(model.justCopied)
+        model.noteCopied()
+        XCTAssertTrue(model.justCopied)
+        model.open(selection: passage, hasPermission: true)
+        XCTAssertFalse(model.justCopied)
+    }
+
     func testTextToCopyIsNilWithoutAnswer() {
         model.open(selection: nil, hasPermission: true)
         XCTAssertNil(model.textToCopy)

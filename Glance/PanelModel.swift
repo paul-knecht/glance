@@ -37,6 +37,9 @@ final class PanelModel: ObservableObject {
     @Published var question = ""
     @Published var questionAnswer: AnswerState = .idle
 
+    // True after ⌘C, so the footer can say "Copied".
+    @Published var justCopied = false
+
     // What ⌘C copies: the tab being shown, or the question's answer.
     private enum CopySource { case tab, question }
     private var copySource = CopySource.tab
@@ -110,8 +113,8 @@ final class PanelModel: ObservableObject {
         questionAnswer = .loading
 
         questionTask = Task {
-            await run(user: Prompts.user(question: text, selection: selection)) { [weak self] state in
-                guard let self, self.generation == generation, self.questionNumber == number else { return }
+            await run(user: Prompts.user(question: text, selection: selection)) { state in
+                guard self.generation == generation, self.questionNumber == number else { return }
                 self.questionAnswer = state
             }
         }
@@ -133,6 +136,11 @@ final class PanelModel: ObservableObject {
         return text.isEmpty ? nil : text
     }
 
+    // Called after the answer was copied to the clipboard.
+    func noteCopied() {
+        justCopied = true
+    }
+
     // Fetches the answer for one tab.
     private func load(_ tab: Action) {
         guard let selection else { return }
@@ -141,8 +149,8 @@ final class PanelModel: ObservableObject {
         answers[tab] = .loading
 
         tabTasks[tab] = Task {
-            await run(user: Prompts.user(for: tab, selection: selection)) { [weak self] state in
-                guard let self, self.generation == generation else { return }
+            await run(user: Prompts.user(for: tab, selection: selection)) { state in
+                guard self.generation == generation else { return }
                 self.answers[tab] = state
             }
         }
@@ -181,5 +189,6 @@ final class PanelModel: ObservableObject {
         question = ""
         questionAnswer = .idle
         copySource = .tab
+        justCopied = false
     }
 }

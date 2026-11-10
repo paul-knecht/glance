@@ -16,6 +16,10 @@ sleep 1
 rm -rf /Applications/Glance.app
 cp -R build/Build/Products/Release/Glance.app /Applications/Glance.app
 
+# Remove the built copies from the project folder. Otherwise Spotlight
+# offers several apps called Glance, and it is easy to start the wrong one.
+rm -rf build/Build/Products/Release/Glance.app build/Build/Products/Debug/Glance.app
+
 open /Applications/Glance.app
 echo "Installed and started /Applications/Glance.app"
 echo "macOS treats a new build as a new app. If the hotkey only shows the"

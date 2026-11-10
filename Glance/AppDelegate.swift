@@ -41,6 +41,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isReading = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Only one copy of Glance may run; this one replaces any older copy.
+        SingleInstance.quitOlderCopies()
+
         // Give the app an Edit menu. It is never visible (Glance has no menu bar
         // of its own), but macOS uses it to make ⌘X, ⌘C, ⌘V and ⌘A work in
         // text fields, for example when pasting the API key.

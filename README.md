@@ -91,6 +91,13 @@ The app in front neither shares its selection nor reacts to `⌘C` in time.
 **The settings window says the hotkey is not available.**
 Another app has registered the same hotkey.
 
+**The panel shows the permission message although Glance is allowed.**
+A different copy of Glance is running, most likely one from the project's
+`build` folder that was opened by accident (Spotlight lists every copy).
+Only one copy runs at a time, and the one started last wins. Open
+`/Applications/Glance.app` to switch back, or run `./scripts/install.sh`,
+which also removes the built copies.
+
 **Glance should no longer start at login.**
 Switch it off in the settings window, or under System Settings > General >
 Login Items.

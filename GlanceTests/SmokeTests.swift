@@ -18,12 +18,18 @@ final class SmokeTests: XCTestCase {
         }
     }
 
-    // The menu behind the menu bar icon offers the API key dialog and Quit.
+    // Glance has no menu bar icon. Opening the app again while it runs
+    // shows the settings window instead.
     @MainActor
-    func testStatusMenuHasKeyAndQuitItems() throws {
+    func testOpeningTheAppAgainShowsSettings() throws {
         let delegate = try XCTUnwrap(NSApp.delegate as? AppDelegate)
-        let titles = delegate.statusItem.menu?.items.map(\.title) ?? []
-        XCTAssertTrue(titles.contains("Set API key…"))
-        XCTAssertTrue(titles.contains("Quit"))
+        XCTAssertFalse(delegate.settingsWindow.isVisible)
+
+        _ = delegate.applicationShouldHandleReopen(NSApp, hasVisibleWindows: false)
+        XCTAssertTrue(delegate.settingsWindow.isVisible)
+        XCTAssertEqual(delegate.settingsWindow.title, "Glance")
+
+        delegate.settingsWindow.close()
+        XCTAssertFalse(delegate.settingsWindow.isVisible)
     }
 }

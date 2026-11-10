@@ -1,18 +1,28 @@
 import AppKit
 import SwiftUI
 
-// Owns the menu bar icon and its menu, the hotkey and the floating panel.
+// Glance has no menu bar icon and no Dock icon. This object owns the
+// hotkey, the floating panel and the settings window.
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-
-    // The icon in the menu bar. We keep a reference so it doesn't disappear.
-    var statusItem: NSStatusItem!
 
     // Where the API key is kept.
     let keychain = KeychainStore()
 
-    // The first line of the menu. It tells you the hotkey.
-    let hotkeyItem = NSMenuItem(title: "Hotkey: ⌃⌥Space", action: nil, keyEquivalent: "")
+    // The settings window, shown when the app is opened again while running.
+    lazy var settingsWindow: NSWindow = {
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable],
+                              backing: .buffered, defer: false)
+        window.title = "Glance"
+        // Keep the window object alive after it is closed, so it can be shown again.
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: SettingsView(
+            hotkeyAvailable: hotkey?.isRegistered ?? false,
+            setAPIKey: { [weak self] in self?.setAPIKey() },
+            quit: { NSApp.terminate(nil) }
+        ))
+        return window
+    }()
 
     // The global hotkey ⌃⌥Space.
     var hotkey: Hotkey!
@@ -31,21 +41,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isReading = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Create the menu bar icon.
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "text.magnifyingglass", accessibilityDescription: "Glance")
-
-        // Clicking the icon opens this menu.
-        let menu = NSMenu()
-        hotkeyItem.isEnabled = false
-        menu.addItem(hotkeyItem)
-        let keyItem = NSMenuItem(title: "Set API key…", action: #selector(setAPIKey), keyEquivalent: "")
-        keyItem.target = self
-        menu.addItem(keyItem)
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        statusItem.menu = menu
-
         // Give the app an Edit menu. It is never visible (Glance has no menu bar
         // of its own), but macOS uses it to make ⌘X, ⌘C, ⌘V and ⌘A work in
         // text fields, for example when pasting the API key.
@@ -75,8 +70,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // The hotkey always arrives on the main thread.
             MainActor.assumeIsolated { self?.hotkeyPressed() }
         }
-        if !hotkey.isRegistered {
-            hotkeyItem.title = "Hotkey ⌃⌥Space is not available"
+
+        // The first time an installed copy runs, add it to the login items.
+        let defaults = UserDefaults.standard
+        if LoginItem.shouldEnableAutomatically(bundlePath: Bundle.main.bundlePath,
+                                               alreadyDone: defaults.bool(forKey: "didSetUpLoginItem")) {
+            LoginItem.setEnabled(true)
+            defaults.set(true, forKey: "didSetUpLoginItem")
         }
 
         // Keys pressed while the panel has the keyboard: esc, ⌘1–⌘4, ⌘C.
@@ -91,6 +91,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.closePanel() }
         }
+    }
+
+    // Called when the user opens Glance while it is already running
+    // (from Applications, Spotlight or the Dock). We show the settings.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return true
+    }
+
+    func showSettings() {
+        // A background app has to step forward, or the window opens behind others.
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow.center()
+        settingsWindow.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Panel

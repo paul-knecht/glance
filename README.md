@@ -1,7 +1,8 @@
 # Glance
 
-A small macOS menu bar app. Select text in any app, press `⌃⌥Space`, and a
-floating panel explains it with Claude. Tabs translate, summarise or rewrite
+A small macOS app that runs in the background, with no Dock icon and no menu
+bar icon. Select text in any app, press `⌃⌥Space`, and a floating panel
+explains it with Claude. Tabs translate, summarise or rewrite
 the selection, and a text field takes your own question about it.
 
 "Glance" is a working name.
@@ -28,19 +29,25 @@ the selection, and a text field takes your own question about it.
 
 ## Setup
 
-### 1. Build and run
-
-Open `Glance.xcodeproj` in Xcode and press Run, or build from the command line:
+### 1. Build and install
 
 ```bash
-xcodebuild -project Glance.xcodeproj -scheme Glance -derivedDataPath build build
+./scripts/install.sh
 ```
 
-```bash
-open build/Build/Products/Debug/Glance.app
-```
+This builds Glance, copies it to `/Applications/Glance.app` and starts it.
+Nothing appears on screen: Glance waits in the background for the hotkey.
+The first time the installed copy runs, it adds itself to your login items,
+so it starts whenever you log in.
 
-A magnifying-glass icon appears in the menu bar. There is no Dock icon.
+To work on the code, open `Glance.xcodeproj` in Xcode and press Run. A copy
+started from Xcode never adds itself to the login items.
+
+### Settings
+
+Open Glance again (from Applications or Spotlight) while it is running. A
+small window appears with **Set API key…**, **Start Glance when I log in**
+and **Quit Glance**.
 
 ### 2. Allow Accessibility
 
@@ -55,8 +62,8 @@ Accessibility permission. In apps that don't share their selection, it presses
 
 ### 3. Add your API key
 
-Click the menu bar icon, choose **Set API key…**, and paste your key. It is
-stored in the macOS Keychain, never in a file.
+Open Glance again to show the settings window, click **Set API key…**, and
+paste your key. It is stored in the macOS Keychain, never in a file.
 
 ## What is sent to Anthropic
 
@@ -81,8 +88,12 @@ build. Choose "Always Allow".
 **The panel says "Select some text first" although text is selected.**
 The app in front neither shares its selection nor reacts to `⌘C` in time.
 
-**The menu says "Hotkey ⌃⌥Space is not available".**
+**The settings window says the hotkey is not available.**
 Another app has registered the same hotkey.
+
+**Glance should no longer start at login.**
+Switch it off in the settings window, or under System Settings > General >
+Login Items.
 
 ## Tests
 

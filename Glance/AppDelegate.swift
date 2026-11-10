@@ -143,38 +143,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Changes the window's height to fit its content. The top edge stays
     // where it is, so the panel grows downwards as the answer arrives.
     private func resizePanel(to height: CGFloat) {
-        guard height > 0, abs(panel.frame.height - height) > 0.5 else { return }
-        var frame = panel.frame
-        let top = frame.maxY
-        frame.size.height = height
-        frame.origin.y = top - height
-
-        // If it would now hang off the bottom of the screen, move it up.
-        if let visible = panel.screen?.visibleFrame {
-            frame.origin.y = max(frame.origin.y, visible.minY + PanelPlacement.margin)
-        }
-        panel.setFrame(frame, display: true)
+        guard height > 0, abs(panel.frame.height - height) > 0.5,
+              let visible = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else { return }
+        panel.setFrame(PanelPlacement.resized(panel.frame, toHeight: height, visible: visible), display: true)
     }
 
     // Handles a key press in the panel. Returns true if the key was used.
     private func handleKey(_ event: NSEvent) -> Bool {
-        let command = event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
-
-        // esc closes the panel.
-        if event.keyCode == 53 {
+        let command = KeyCommand.from(keyCode: event.keyCode,
+                                      characters: event.charactersIgnoringModifiers,
+                                      modifiers: event.modifierFlags)
+        switch command {
+        case .close:
             closePanel()
             return true
-        }
 
-        // ⌘1 to ⌘4 switch tabs.
-        if command, let number = Int(event.charactersIgnoringModifiers ?? ""),
-           let tab = Action(rawValue: number - 1), model.notice == nil {
+        case .tab(let tab):
             model.select(tab)
             return true
-        }
 
-        // ⌘C copies the answer, unless text is selected in the question field.
-        if command, event.charactersIgnoringModifiers == "c" {
+        case .copy:
+            // If text is selected in the question field, let ⌘C copy that as usual.
             if let editor = panel.firstResponder as? NSTextView, editor.selectedRange().length > 0 {
                 return false
             }
@@ -183,9 +172,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSPasteboard.general.setString(text, forType: .string)
             model.noteCopied()
             return true
-        }
 
-        return false
+        case .none:
+            return false
+        }
     }
 
     // Shows a small dialog where the user types their Anthropic API key.

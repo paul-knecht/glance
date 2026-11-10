@@ -13,8 +13,14 @@ struct PanelView: View {
     // How tall the answer is, so the scrolling area is only as tall as needed.
     @State private var answerHeight: CGFloat = 0
 
-    // The answer area never grows beyond this; longer answers scroll.
-    private let maxAnswerHeight: CGFloat = 300
+    // The same for the answer to the user's own question.
+    @State private var questionAnswerHeight: CGFloat = 0
+
+    // The two answer areas never grow beyond these; longer answers scroll.
+    // Together with the tabs, the field and the footer that keeps the panel
+    // at roughly 460 points at most.
+    private let maxAnswerHeight: CGFloat = 220
+    private let maxQuestionAnswerHeight: CGFloat = 110
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -172,12 +178,20 @@ struct PanelView: View {
                 .onSubmit { model.ask() }
 
             if model.questionAnswer != .idle {
-                if !model.questionAnswer.text.isEmpty {
-                    Text(model.questionAnswer.text)
-                        .font(.system(size: 13))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !model.questionAnswer.text.isEmpty {
+                            Text(model.questionAnswer.text).font(.system(size: 13))
+                        }
+                        statusLine(model.questionAnswer)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(GeometryReader { geometry in
+                        Color.clear.preference(key: QuestionAnswerHeightKey.self, value: geometry.size.height)
+                    })
                 }
-                statusLine(model.questionAnswer)
+                .frame(height: min(max(questionAnswerHeight, 16), maxQuestionAnswerHeight))
+                .onPreferenceChange(QuestionAnswerHeightKey.self) { questionAnswerHeight = $0 }
             }
         }
     }
@@ -215,6 +229,14 @@ struct PanelView: View {
 
 // Carries the panel's height from the view up to the window.
 private struct PanelHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+// Carries the height of the question's answer to its scrolling area.
+private struct QuestionAnswerHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())

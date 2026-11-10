@@ -33,29 +33,58 @@ enum SelectionReader {
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
 
         // Way 1 runs in the background so a slow app cannot freeze our menu bar icon.
-        let direct = await Task.detached { readDirectly(screenHeight: screenHeight) }.value
-        if let direct { return direct }
+        let (selection, outcome) = await Task.detached { readDirectly(screenHeight: screenHeight) }.value
+        switch outcome {
+        case .found: return selection
+        case .nothingSelected: return nil
+        case .unknown: break
+        }
 
         // Way 2.
-        guard let text = await readByCopying() else { return nil }
-        let selection = Selection(text: text, context: nil, anchor: nil)
-        return selection.text.isEmpty ? nil : selection
+        let text = await copySelection(
+            pasteboard: .general,
+            modifiersReleased: { NSEvent.modifierFlags.intersection([.control, .option, .shift]).isEmpty },
+            pressCopy: pressCommandC)
+        guard let text else { return nil }
+        let copied = Selection(text: text, context: nil, anchor: nil)
+        return copied.text.isEmpty ? nil : copied
+    }
+
+    // What asking the other app told us.
+    enum DirectOutcome: Equatable {
+        case found             // it gave us the selected text
+        case nothingSelected   // a text field told us nothing is selected: believe it
+        case unknown           // no usable answer: try copying instead
+    }
+
+    // Decides what an app's answer means. `selectedText` is nil if the app
+    // did not answer; `role` is the kind of element that has the keyboard.
+    static func outcome(selectedText: String?, role: String?) -> DirectOutcome {
+        guard let selectedText else { return .unknown }
+        if !selectedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .found }
+        // Only real text fields are trusted when they say "nothing selected".
+        // Other elements often say that simply because they don't know, and
+        // pressing ⌘C in a text field with nothing selected would just beep.
+        let textRoles = [kAXTextFieldRole as String, kAXTextAreaRole as String]
+        return textRoles.contains(role ?? "") ? .nothingSelected : .unknown
     }
 
     // MARK: - Way 1: ask the other app
 
-    private static func readDirectly(screenHeight: CGFloat) -> Selection? {
+    private static func readDirectly(screenHeight: CGFloat) -> (Selection?, DirectOutcome) {
         let system = AXUIElementCreateSystemWide()
         // Never wait longer than a second for another app to answer.
         AXUIElementSetMessagingTimeout(system, 1.0)
 
         guard let focused = attribute(kAXFocusedUIElementAttribute, of: system),
-              CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
+              CFGetTypeID(focused) == AXUIElementGetTypeID() else { return (nil, .unknown) }
         let element = focused as! AXUIElement
         AXUIElementSetMessagingTimeout(element, 1.0)
 
-        guard let text = attribute(kAXSelectedTextAttribute, of: element) as? String,
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let selectedText = attribute(kAXSelectedTextAttribute, of: element) as? String
+        let role = attribute(kAXRoleAttribute, of: element) as? String
+        let outcome = outcome(selectedText: selectedText, role: role)
+        guard outcome == .found, let text = selectedText else { return (nil, outcome) }
 
         // Optional extras: where the selection is, and the sentence around it.
         var anchor: CGRect?
@@ -67,7 +96,7 @@ enum SelectionReader {
                 context = sentence(around: range, in: element)
             }
         }
-        return Selection(text: text, context: context, anchor: anchor)
+        return (Selection(text: text, context: context, anchor: anchor), .found)
     }
 
     // Reads one piece of information ("attribute") from an element of another app.
@@ -125,51 +154,85 @@ enum SelectionReader {
 
     // MARK: - Way 2: copy and read the clipboard
 
-    @MainActor
-    private static func readByCopying() async -> String? {
-        let pasteboard = NSPasteboard.general
+    // Set when an app had not copied by the time we gave up. The task keeps
+    // watching the clipboard a little longer and undoes a late copy.
+    @MainActor static var lateRestore: Task<Void, Never>?
 
+    // Presses ⌘C (through `pressCopy`), reads what lands on the clipboard and
+    // puts the old contents back. The pieces are passed in so tests can use
+    // a private clipboard and a pretend app.
+    @MainActor
+    static func copySelection(pasteboard: NSPasteboard,
+                              modifiersReleased: () -> Bool,
+                              pressCopy: () -> Void) async -> String? {
         // Remember everything on the clipboard so we can put it back.
-        let saved: [[(NSPasteboard.PasteboardType, Data)]] = (pasteboard.pasteboardItems ?? []).map { item in
-            item.types.compactMap { type in item.data(forType: type).map { (type, $0) } }
-        }
+        let saved = contents(of: pasteboard)
         let countBefore = pasteboard.changeCount
 
         // The user is still holding Control and Option from the hotkey. Wait
         // until they let go; otherwise the app would see ⌃⌥⌘C, not ⌘C.
         var released = false
         for _ in 0..<30 {
-            if NSEvent.modifierFlags.intersection([.control, .option, .shift]).isEmpty {
+            if modifiersReleased() {
                 released = true
                 break
             }
-            try? await Task.sleep(nanoseconds: 20_000_000)
+            await pause(milliseconds: 20)
         }
         guard released else { return nil }
 
-        pressCommandC()
+        pressCopy()
 
-        // Give the app up to 0.4 seconds to put the selection on the clipboard.
-        var text: String?
-        for _ in 0..<20 {
-            try? await Task.sleep(nanoseconds: 20_000_000)
+        // Give the app up to 0.6 seconds to put the selection on the clipboard.
+        for _ in 0..<30 {
+            await pause(milliseconds: 20)
             if pasteboard.changeCount != countBefore {
-                text = pasteboard.string(forType: .string)
-                break
+                // Some apps empty the clipboard first and fill it a moment later.
+                await pause(milliseconds: 20)
+                let text = pasteboard.string(forType: .string)
+                restore(saved, to: pasteboard)
+                return text
             }
         }
 
-        // Put the old contents back, whatever happened.
-        if pasteboard.changeCount != countBefore {
-            pasteboard.clearContents()
-            let items = saved.map { entries -> NSPasteboardItem in
-                let item = NSPasteboardItem()
-                for (type, data) in entries { item.setData(data, forType: type) }
-                return item
+        // The app has not copied (yet). Keep watching for 1.5 seconds so that
+        // a slow copy does not replace what the user had on the clipboard.
+        lateRestore = Task { @MainActor in
+            for _ in 0..<30 {
+                await pause(milliseconds: 50)
+                if pasteboard.changeCount != countBefore {
+                    await pause(milliseconds: 20)
+                    restore(saved, to: pasteboard)
+                    return
+                }
             }
-            if !items.isEmpty { pasteboard.writeObjects(items) }
         }
-        return text
+        return nil
+    }
+
+    private typealias SavedClipboard = [[(NSPasteboard.PasteboardType, Data)]]
+
+    // Everything on the clipboard: each item with all its kinds of data.
+    @MainActor
+    private static func contents(of pasteboard: NSPasteboard) -> SavedClipboard {
+        (pasteboard.pasteboardItems ?? []).map { item in
+            item.types.compactMap { type in item.data(forType: type).map { (type, $0) } }
+        }
+    }
+
+    @MainActor
+    private static func restore(_ saved: SavedClipboard, to pasteboard: NSPasteboard) {
+        pasteboard.clearContents()
+        let items = saved.map { entries -> NSPasteboardItem in
+            let item = NSPasteboardItem()
+            for (type, data) in entries { item.setData(data, forType: type) }
+            return item
+        }
+        if !items.isEmpty { pasteboard.writeObjects(items) }
+    }
+
+    private static func pause(milliseconds: UInt64) async {
+        try? await Task.sleep(nanoseconds: milliseconds * 1_000_000)
     }
 
     // Sends the key press ⌘C to the app in front.

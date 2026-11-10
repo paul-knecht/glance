@@ -32,4 +32,18 @@ enum PanelPlacement {
 
         return CGPoint(x: x, y: y)
     }
+
+    // The panel's new frame when its content needs a different height.
+    // The top edge stays where it is, so the panel grows downwards.
+    static func resized(_ frame: CGRect, toHeight height: CGFloat, visible: CGRect) -> CGRect {
+        var result = frame
+        result.size.height = height
+        result.origin.y = frame.maxY - height
+
+        // Keep the bottom on screen, but never at the cost of the top:
+        // the tab bar must stay visible.
+        result.origin.y = max(result.origin.y, visible.minY + margin)
+        result.origin.y = min(result.origin.y, visible.maxY - margin - height)
+        return result
+    }
 }

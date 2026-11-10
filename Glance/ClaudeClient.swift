@@ -31,6 +31,15 @@ enum ClaudeClient {
 
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
+    // A session that keeps nothing: no cache and no cookies, neither on
+    // disk nor in memory.
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        return URLSession(configuration: configuration)
+    }()
+
     // Builds the JSON we send to Claude.
     static func requestBody(system: String, user: String) throws -> Data {
         let body: [String: Any] = [
@@ -80,7 +89,7 @@ enum ClaudeClient {
                     let bytes: URLSession.AsyncBytes
                     let response: URLResponse
                     do {
-                        (bytes, response) = try await URLSession.shared.bytes(for: request)
+                        (bytes, response) = try await session.bytes(for: request)
                     } catch is CancellationError {
                         throw CancellationError()
                     } catch {

@@ -102,3 +102,7 @@ xcodebuild -project Glance.xcodeproj -scheme Glance -derivedDataPath build test
 ```
 
 No test calls the real API.
+
+## Licence
+
+MIT. See `LICENSE`.

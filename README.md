@@ -1,11 +1,19 @@
 # Glance
 
+<p align="center"><img src="docs/images/glance-panel.png" width="420" alt="Glance panel explaining the selected words &quot;Claude Code&quot;"></p>
+
 A small macOS app that runs in the background, with no Dock icon and no menu
 bar icon. Select text in any app, press `⌃⌥Space`, and a floating panel
 explains it with Claude. Tabs translate, summarise or rewrite
 the selection, and a text field takes your own question about it.
 
 "Glance" is a working name.
+
+## Why I built it
+
+When I read on my Mac, I often want to look something up without leaving the text: what a word means, how it translates, what a passage says. The trackpad's Look Up does this for single words. Glance does the same with Claude's answer, and adds summarising, rewriting and my own question about the selection.
+
+Built with [Claude Code](https://claude.com/claude-code) while learning Swift, Xcode and Git.
 
 ## What it does
 
